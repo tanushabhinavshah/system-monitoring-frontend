@@ -13,10 +13,25 @@ const getMockCpuAllocation = async (): Promise<CpuAllocationData> => {
     };
 };
 
+interface BackendCpuAllocation {
+    id: number;
+    total_cores: number;
+    allocated_cores: number;
+    reason: string;
+    created_at: string;
+    updated_at: string;
+}
+
 // Real API implementation
 const getRealCpuAllocation = async (): Promise<CpuAllocationData> => {
-    const response = await apiClient.get<CpuAllocationData>(API_ENDPOINTS.CPU.ALLOCATION);
-    return response.data;
+    const response = await apiClient.get<BackendCpuAllocation>(API_ENDPOINTS.CPU.ALLOCATION);
+    const data = response.data;
+
+    return {
+        total_cores: data.total_cores,
+        allocated_cores: data.allocated_cores,
+        last_scaled_at: data.updated_at || data.created_at || new Date().toISOString(),
+    };
 };
 
 export const cpuService = {

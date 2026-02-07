@@ -33,37 +33,71 @@ const mockStreamMetrics = (callbacks: MetricStreamCallbacks): (() => void) => {
 
 // Real SSE implementation
 const realStreamMetrics = (callbacks: MetricStreamCallbacks): (() => void) => {
-  const eventSource = new EventSource(
-    `${apiClient.defaults.baseURL}${API_ENDPOINTS.METRICS.STREAM}`
-  );
+  let eventSource: EventSource | null = null;
+  let retryTimeout: NodeJS.Timeout | null = null;
+  let isManuallyClosed = false;
 
-  const handleMetricUpdate = (event: MessageEvent) => {
-    try {
-      const rawData = JSON.parse(event.data);
-      const mappedData: MetricData = {
-        timestamp: new Date(rawData.timestamp).getTime(),
-        cpuUsagePercent: rawData.cpu_usage_percent,
-        memoryUsagePercent: rawData.memory_usage_percent,
-        networkInKb: rawData.network_in_kb,
-        networkOutKb: rawData.network_out_kb,
-      };
-      callbacks.onData(mappedData);
-    } catch (error) {
-      callbacks.onError(new Error('Failed to parse metric data'));
-    }
+  const connect = () => {
+    if (isManuallyClosed) return;
+
+    const url = `${apiClient.defaults.baseURL}${API_ENDPOINTS.METRICS.STREAM}`;
+    console.log(`Connecting to metrics SSE: ${url}`);
+
+    eventSource = new EventSource(url);
+
+    const handleMetricUpdate = (event: MessageEvent) => {
+      try {
+        const rawData = JSON.parse(event.data);
+        const mappedData: MetricData = {
+          timestamp: new Date(rawData.timestamp).getTime(),
+          cpuUsagePercent: rawData.cpu_usage_percent,
+          memoryUsagePercent: rawData.memory_usage_percent,
+          networkInKb: rawData.network_in_kb,
+          networkOutKb: rawData.network_out_kb,
+        };
+        callbacks.onData(mappedData);
+      } catch (error) {
+        console.error('Failed to parse metric data:', error);
+        callbacks.onError(new Error('Failed to parse metric data'));
+      }
+    };
+
+    eventSource.addEventListener('metric_update', handleMetricUpdate as EventListener);
+
+    eventSource.onopen = () => {
+      console.log('Metrics SSE connection established');
+    };
+
+    eventSource.onerror = (error) => {
+      if (isManuallyClosed) return;
+
+      console.error('Metrics SSE connection error:', error);
+      callbacks.onError(new Error('SSE connection error. Attempting to reconnect...'));
+
+      if (eventSource) {
+        eventSource.close();
+        eventSource = null;
+      }
+
+      // Retry connection after 5 seconds if not manually closed
+      if (!isManuallyClosed) {
+        if (retryTimeout) clearTimeout(retryTimeout);
+        retryTimeout = setTimeout(connect, 5000);
+      }
+    };
   };
 
-  eventSource.addEventListener('metric_update', handleMetricUpdate as EventListener);
-
-  eventSource.onerror = () => {
-    callbacks.onError(new Error('SSE connection error'));
-    eventSource.close();
-  };
+  connect();
 
   // Return cleanup function
   return () => {
-    eventSource.removeEventListener('metric_update', handleMetricUpdate as EventListener);
-    eventSource.close();
+    console.log('Closing metrics SSE connection');
+    isManuallyClosed = true;
+    if (retryTimeout) clearTimeout(retryTimeout);
+    if (eventSource) {
+      eventSource.close();
+      eventSource = null;
+    }
   };
 };
 

@@ -57,6 +57,8 @@ const realStreamAlerts = (callbacks: AlertStreamCallbacks): (() => void) => {
         eventSource.addEventListener('alert_event', handleAlertEvent as EventListener);
 
         eventSource.onerror = (error) => {
+            if (isManuallyClosed) return;
+
             console.error('Alert SSE connection error:', error);
             callbacks.onError(new Error('Alert stream disconnected. Attempting to reconnect...'));
 

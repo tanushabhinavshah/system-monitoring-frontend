@@ -63,7 +63,17 @@ export const CpuAllocationCard = ({ data, loading }: CpuAllocationCardProps) => 
 
             <div className="pt-4 border-t border-border flex items-center gap-2 text-xs text-muted-foreground">
                 <Calendar className="w-3.5 h-3.5" />
-                <span>Last Scaled: {format(new Date(data.last_scaled_at), 'MMM d, HH:mm:ss')}</span>
+                <span>
+                    Last Scaled: {(() => {
+                        try {
+                            const date = new Date(data.last_scaled_at);
+                            if (isNaN(date.getTime())) return 'Unknown';
+                            return format(date, 'MMM d, HH:mm:ss');
+                        } catch (e) {
+                            return 'Unknown';
+                        }
+                    })()}
+                </span>
             </div>
         </div>
     );
