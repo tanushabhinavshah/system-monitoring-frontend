@@ -3,21 +3,37 @@ import { CpuChart } from '../components/CpuChart';
 import { MemoryChart } from '../components/MemoryChart';
 import { NetworkChart } from '../components/NetworkChart';
 import { MetricCard } from '../components/MetricCard';
-import { MetricPieChart } from '../components/MetricPieChart';
+import { CpuAllocationCard } from '../components/CpuAllocationCard';
 import { metricService } from '@/services/metricService';
+import { alertService } from '@/services/alertService';
+import { cpuService } from '@/services/cpuService';
 import { formatTime } from '../utils/dashboardUtils';
 import { MAX_DATA_POINTS, METRIC_LABELS } from '../constants/dashboardConstants';
-import type { MetricData, ChartData, NetworkChartData } from '../types/dashboardTypes';
+import type { MetricData, ChartData, NetworkChartData, CpuAllocationData } from '../types/dashboardTypes';
+import { toast } from 'sonner';
 
 export const DashboardContainer = () => {
   const [metrics, setMetrics] = useState<MetricData[]>([]);
   const [latestMetric, setLatestMetric] = useState<MetricData | null>(null);
+  const [cpuAllocation, setCpuAllocation] = useState<CpuAllocationData | null>(null);
+  const [isLoadingCpu, setIsLoadingCpu] = useState(false);
+
+  const fetchCpuAllocation = useCallback(async () => {
+    setIsLoadingCpu(true);
+    try {
+      const data = await cpuService.getCpuAllocation();
+      setCpuAllocation(data);
+    } catch (error) {
+      console.error('Failed to fetch CPU allocation:', error);
+    } finally {
+      setIsLoadingCpu(false);
+    }
+  }, []);
 
   const handleNewMetric = useCallback((data: MetricData) => {
     setLatestMetric(data);
     setMetrics((prev) => {
       const updated = [...prev, data];
-      // Keep only last MAX_DATA_POINTS records
       if (updated.length > MAX_DATA_POINTS) {
         return updated.slice(-MAX_DATA_POINTS);
       }
@@ -25,18 +41,53 @@ export const DashboardContainer = () => {
     });
   }, []);
 
+  // Initial fetch of CPU allocation
   useEffect(() => {
-    const cleanup = metricService.streamMetrics({
+    fetchCpuAllocation();
+  }, [fetchCpuAllocation]);
+
+  useEffect(() => {
+    const metricsCleanup = metricService.streamMetrics({
       onData: handleNewMetric,
       onError: (error) => {
         console.error('Metric stream error:', error);
       },
     });
 
-    return cleanup;
-  }, [handleNewMetric]);
+    const alertsCleanup = alertService.streamAlerts({
+      onAlert: (alert) => {
+        // Show severity-based toast
+        const toastFn = alert.severity === 'critical' ? toast.error : toast.warning;
 
-  // Transform data for charts
+        toastFn(`${alert.resource_type.toUpperCase()} Alert: ${alert.event_type}`, {
+          description: alert.reason,
+          duration: alert.severity === 'critical' ? 8000 : 5000,
+          style: alert.severity === 'warning' ? {
+            backgroundColor: '#fff7ed',
+            color: '#c2410c',
+            borderColor: '#ffedd5'
+          } : undefined
+        });
+
+        // Trigger CPU allocation update if it's a CPU alert
+        if (alert.resource_type === 'cpu') {
+          fetchCpuAllocation();
+        }
+      },
+      onError: (error) => {
+        console.error('Alert stream error:', error);
+        toast.error('Alert stream disconnected', {
+          description: 'Attempting to reconnect...',
+        });
+      },
+    });
+
+    return () => {
+      metricsCleanup();
+      alertsCleanup();
+    };
+  }, [handleNewMetric, fetchCpuAllocation]);
+
   const cpuChartData: ChartData[] = metrics.map((m) => ({
     time: formatTime(m.timestamp),
     value: m.cpuUsagePercent,
@@ -55,13 +106,11 @@ export const DashboardContainer = () => {
 
   return (
     <div className="space-y-6 animate-fade-in">
-      {/* Header */}
       <div>
         <h1 className="text-2xl font-bold text-foreground">Dashboard</h1>
         <p className="text-muted-foreground">Real-time system resource monitoring</p>
       </div>
 
-      {/* Metric Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         <MetricCard
           label={METRIC_LABELS.CPU}
@@ -89,15 +138,11 @@ export const DashboardContainer = () => {
         />
       </div>
 
-      {/* Charts Grid */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <CpuChart data={cpuChartData} />
         <MemoryChart data={memoryChartData} />
         <NetworkChart data={networkChartData} />
-        <MetricPieChart
-          cpuPercent={latestMetric?.cpuUsagePercent ?? 0}
-          memoryPercent={latestMetric?.memoryUsagePercent ?? 0}
-        />
+        <CpuAllocationCard data={cpuAllocation} loading={isLoadingCpu} />
       </div>
     </div>
   );

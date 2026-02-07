@@ -24,3 +24,19 @@ export interface NetworkChartData {
   networkIn: number;
   networkOut: number;
 }
+
+export type AlertSeverity = 'warning' | 'critical';
+
+export interface AlertEvent {
+  resource_type: string;
+  severity: AlertSeverity;
+  event_type: string;
+  reason: string;
+  event_at: string;
+}
+
+export interface CpuAllocationData {
+  total_cores: number;
+  allocated_cores: number;
+  last_scaled_at: string;
+}

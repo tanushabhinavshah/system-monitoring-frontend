@@ -17,6 +17,12 @@ export const API_ENDPOINTS = {
     GET: '/threshold',
     UPDATE: '/threshold',
   },
+  ALERTS: {
+    STREAM: '/alerts/stream',
+  },
+  CPU: {
+    ALLOCATION: '/cpu-allocation',
+  },
 } as const;
 
 export const MOCK_DELAY_MS = 800;

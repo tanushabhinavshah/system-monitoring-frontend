@@ -20,14 +20,36 @@ const mockUpdateThresholds = async (data: ThresholdData): Promise<ThresholdRespo
 
 // Real API implementations
 const realGetThresholds = async (): Promise<ThresholdData> => {
-  const response = await apiClient.get<ThresholdData>(API_ENDPOINTS.THRESHOLDS.GET);
+  const response = await apiClient.get(API_ENDPOINTS.THRESHOLDS.GET);
+
+  const apiData = response.data;
+
+  return {
+    cpuThreshold: apiData.cpu_threshold,
+    memoryThreshold: apiData.memory_threshold,
+    networkInThreshold: apiData.network_in_threshold,
+    networkOutThreshold: apiData.network_out_threshold,
+  };
+};
+
+const realUpdateThresholds = async (
+  data: ThresholdData
+): Promise<ThresholdResponse> => {
+  const payload = {
+    cpu_threshold: data.cpuThreshold,
+    memory_threshold: data.memoryThreshold,
+    network_in_threshold: data.networkInThreshold,
+    network_out_threshold: data.networkOutThreshold,
+  };
+
+  const response = await apiClient.patch(
+    API_ENDPOINTS.THRESHOLDS.UPDATE,
+    payload
+  );
+
   return response.data;
 };
 
-const realUpdateThresholds = async (data: ThresholdData): Promise<ThresholdResponse> => {
-  const response = await apiClient.patch<ThresholdResponse>(API_ENDPOINTS.THRESHOLDS.UPDATE, data);
-  return response.data;
-};
 
 export const thresholdService = {
   getThresholds: USE_MOCK_API ? mockGetThresholds : realGetThresholds,
