@@ -6,6 +6,8 @@ import { Label } from '@/components/ui/label';
 import { registerSchema, type RegisterSchemaType } from '../schemas/registerSchema';
 import { REGISTER_FORM_LABELS } from '../constants/registerConstants';
 import { Loader2, User, Mail, Lock } from 'lucide-react';
+import { PasswordRequirementList } from '../../components/PasswordRequirementList';
+import { AUTH_VALIDATION } from '../../constants/authConstants';
 
 interface RegisterFormProps {
   onSubmit: (data: RegisterSchemaType) => void;
@@ -17,6 +19,8 @@ export const RegisterForm = ({ onSubmit, isLoading, error }: RegisterFormProps) 
   const {
     register,
     handleSubmit,
+    watch,
+    setValue,
     formState: { errors },
   } = useForm<RegisterSchemaType>({
     resolver: zodResolver(registerSchema),
@@ -27,6 +31,18 @@ export const RegisterForm = ({ onSubmit, isLoading, error }: RegisterFormProps) 
       confirmPassword: '',
     },
   });
+
+  const passwordValue = watch('password');
+
+  // Handle name input to strip numbers in real-time
+  const handleNameChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const value = e.target.value;
+    const filteredValue = value.replace(/[0-9]/g, '');
+    if (value !== filteredValue) {
+      // If numbers were removed, we manually set the value back
+      setValue('name', filteredValue, { shouldValidate: true });
+    }
+  };
 
   return (
     <form onSubmit={handleSubmit(onSubmit)} className="space-y-5">
@@ -41,7 +57,9 @@ export const RegisterForm = ({ onSubmit, isLoading, error }: RegisterFormProps) 
             type="text"
             placeholder="Enter your full name"
             className="pl-10 form-input"
-            {...register('name')}
+            {...register('name', {
+              onChange: handleNameChange
+            })}
           />
         </div>
         {errors.name && (
@@ -82,8 +100,9 @@ export const RegisterForm = ({ onSubmit, isLoading, error }: RegisterFormProps) 
             {...register('password')}
           />
         </div>
+        <PasswordRequirementList value={passwordValue} />
         {errors.password && (
-          <p className="text-sm text-destructive">{errors.password.message}</p>
+          <p className="text-sm text-destructive mt-1">{errors.password.message}</p>
         )}
       </div>
 

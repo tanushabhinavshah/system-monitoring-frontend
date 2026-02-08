@@ -1,33 +1,32 @@
 import { z } from 'zod';
+import { AUTH_VALIDATION } from '../../constants/authConstants';
 
 export const registerSchema = z
   .object({
     name: z
       .string()
       .trim()
-      .min(2, 'Name must be at least 2 characters')
-      .max(50, 'Name must not exceed 50 characters')
-      .regex(/^[A-Za-z ]+$/, 'Name can only contain letters and spaces'),
+      .min(AUTH_VALIDATION.NAME.MIN, `Name must be at least ${AUTH_VALIDATION.NAME.MIN} characters`)
+      .max(AUTH_VALIDATION.NAME.MAX, `Name must not exceed ${AUTH_VALIDATION.NAME.MAX} characters`)
+      .regex(AUTH_VALIDATION.NAME.REGEX, AUTH_VALIDATION.NAME.MESSAGE),
 
     email: z
       .string()
-      .trim()
       .min(1, 'Email is required')
-      .email('Invalid email address')
-      .toLowerCase(),
+      .regex(AUTH_VALIDATION.EMAIL.REGEX, AUTH_VALIDATION.EMAIL.MESSAGE),
 
     password: z
       .string()
-      .min(8, 'Password must be at least 8 characters')
-      .max(64, 'Password must not exceed 64 characters')
-      .regex(/[A-Z]/, 'Password must contain at least one uppercase letter')
-      .regex(/[a-z]/, 'Password must contain at least one lowercase letter')
-      .regex(/[0-9]/, 'Password must contain at least one number')
+      .min(AUTH_VALIDATION.PASSWORD.MIN, `Password must be at least ${AUTH_VALIDATION.PASSWORD.MIN} characters`)
+      .max(AUTH_VALIDATION.PASSWORD.MAX, `Password must not exceed ${AUTH_VALIDATION.PASSWORD.MAX} characters`)
+      .regex(AUTH_VALIDATION.PASSWORD.UPPERCASE_REGEX, 'Password must contain at least one uppercase letter')
+      .regex(AUTH_VALIDATION.PASSWORD.LOWERCASE_REGEX, 'Password must contain at least one lowercase letter')
+      .regex(AUTH_VALIDATION.PASSWORD.NUMBER_REGEX, 'Password must contain at least one number')
       .regex(
-        /[!@#$%^&*(),.?":{}|<>]/,
+        AUTH_VALIDATION.PASSWORD.SPECIAL_CHAR_REGEX,
         'Password must contain at least one special character'
       )
-      .refine((val) => !/\s/.test(val), {
+      .refine((val) => AUTH_VALIDATION.PASSWORD.NO_SPACE_REGEX.test(val), {
         message: 'Password must not contain spaces',
       }),
 
