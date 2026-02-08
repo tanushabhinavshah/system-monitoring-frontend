@@ -47,8 +47,18 @@ const realStreamAlerts = (callbacks: AlertStreamCallbacks): (() => void) => {
 
         const handleAlertEvent = (event: MessageEvent) => {
             try {
-                const data: AlertEvent = JSON.parse(event.data);
-                callbacks.onAlert(data);
+                const rawData = JSON.parse(event.data);
+
+                // Map backend fields to AlertEvent interface
+                const mappedAlert: AlertEvent = {
+                    resource_type: rawData.resource_type || 'system',
+                    severity: rawData.severity || 'warning',
+                    event_type: rawData.event_type || rawData.type || 'status_change',
+                    reason: rawData.reason || rawData.message || 'No details provided',
+                    event_at: rawData.event_at || rawData.timestamp || new Date().toISOString(),
+                };
+
+                callbacks.onAlert(mappedAlert);
             } catch (error) {
                 console.error('Failed to parse alert event data', error);
             }

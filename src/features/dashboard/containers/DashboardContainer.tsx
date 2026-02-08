@@ -1,92 +1,18 @@
-import { useEffect, useState, useCallback } from 'react';
 import { CpuChart } from '../components/CpuChart';
 import { MemoryChart } from '../components/MemoryChart';
 import { NetworkChart } from '../components/NetworkChart';
 import { MetricCard } from '../components/MetricCard';
 import { CpuAllocationCard } from '../components/CpuAllocationCard';
-import { metricService } from '@/services/metricService';
-import { alertService } from '@/services/alertService';
-import { cpuService } from '@/services/cpuService';
 import { formatTime } from '../utils/dashboardUtils';
-import { MAX_DATA_POINTS, METRIC_LABELS } from '../constants/dashboardConstants';
-import type { MetricData, ChartData, NetworkChartData, CpuAllocationData } from '../types/dashboardTypes';
-import { toast } from 'sonner';
+import { METRIC_LABELS } from '../constants/dashboardConstants';
+import type { ChartData, NetworkChartData } from '../types/dashboardTypes';
+import { useSystemStore } from '@/store/systemStore';
 
 export const DashboardContainer = () => {
-  const [metrics, setMetrics] = useState<MetricData[]>([]);
-  const [latestMetric, setLatestMetric] = useState<MetricData | null>(null);
-  const [cpuAllocation, setCpuAllocation] = useState<CpuAllocationData | null>(null);
-  const [isLoadingCpu, setIsLoadingCpu] = useState(false);
-
-  const fetchCpuAllocation = useCallback(async () => {
-    setIsLoadingCpu(true);
-    try {
-      const data = await cpuService.getCpuAllocation();
-      setCpuAllocation(data);
-    } catch (error) {
-      console.error('Failed to fetch CPU allocation:', error);
-    } finally {
-      setIsLoadingCpu(false);
-    }
-  }, []);
-
-  const handleNewMetric = useCallback((data: MetricData) => {
-    setLatestMetric(data);
-    setMetrics((prev) => {
-      const updated = [...prev, data];
-      if (updated.length > MAX_DATA_POINTS) {
-        return updated.slice(-MAX_DATA_POINTS);
-      }
-      return updated;
-    });
-  }, []);
-
-  // Initial fetch of CPU allocation
-  useEffect(() => {
-    fetchCpuAllocation();
-  }, [fetchCpuAllocation]);
-
-  useEffect(() => {
-    const metricsCleanup = metricService.streamMetrics({
-      onData: handleNewMetric,
-      onError: (error) => {
-        console.error('Metric stream error:', error);
-      },
-    });
-
-    const alertsCleanup = alertService.streamAlerts({
-      onAlert: (alert) => {
-        // Show severity-based toast
-        const toastFn = alert.severity === 'critical' ? toast.error : toast.warning;
-
-        toastFn(`${alert.resource_type.toUpperCase()} Alert: ${alert.event_type}`, {
-          description: alert.reason,
-          duration: alert.severity === 'critical' ? 8000 : 5000,
-          style: alert.severity === 'warning' ? {
-            backgroundColor: '#fff7ed',
-            color: '#c2410c',
-            borderColor: '#ffedd5'
-          } : undefined
-        });
-
-        // Trigger CPU allocation update if it's a CPU alert
-        if (alert.resource_type === 'cpu') {
-          fetchCpuAllocation();
-        }
-      },
-      onError: (error) => {
-        console.error('Alert stream error:', error);
-        toast.error('Alert stream disconnected', {
-          description: 'Attempting to reconnect...',
-        });
-      },
-    });
-
-    return () => {
-      metricsCleanup();
-      alertsCleanup();
-    };
-  }, [handleNewMetric, fetchCpuAllocation]);
+  const metrics = useSystemStore((state) => state.metrics);
+  const latestMetric = useSystemStore((state) => state.latestMetric);
+  const cpuAllocation = useSystemStore((state) => state.cpuAllocation);
+  const isLoadingCpu = useSystemStore((state) => state.isLoadingCpu);
 
   const cpuChartData: ChartData[] = metrics.map((m) => ({
     time: formatTime(m.timestamp),
